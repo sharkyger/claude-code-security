@@ -4,27 +4,29 @@
       {
         "matcher": "Bash",
         "hooks": [
-          {
-            "type": "command",
-            "command": "~/.claude/hooks/dependency-security-gate.sh"
-          },
-          {
-            "type": "command",
-            "command": "~/.claude/hooks/block-dangerous-bash.sh"
-          },
-          {
-            "type": "command",
-            "command": "~/.claude/hooks/block-dangerous-git.sh"
-          }
+          { "type": "command", "command": "~/.claude/hooks/dependency-security-gate.sh" },
+          { "type": "command", "command": "~/.claude/hooks/block-dangerous-bash.sh" },
+          { "type": "command", "command": "~/.claude/hooks/block-dangerous-git.sh" }
         ]
       },
       {
         "matcher": "Read|Edit|Write",
         "hooks": [
-          {
-            "type": "command",
-            "command": "~/.claude/hooks/protect-sensitive-files.sh"
-          }
+          { "type": "command", "command": "~/.claude/hooks/protect-sensitive-files.sh" }
+        ]
+      },
+      {
+        "matcher": "Write",
+        "hooks": [
+          { "type": "command", "command": "~/.claude/hooks/gitleaks-pre-write.sh" }
+        ]
+      }
+    ],
+    "UserPromptSubmit": [
+      {
+        "matcher": "",
+        "hooks": [
+          { "type": "command", "command": "~/.claude/hooks/pii-redaction-gate.sh" }
         ]
       }
     ],
@@ -32,10 +34,7 @@
       {
         "matcher": "Edit|Write",
         "hooks": [
-          {
-            "type": "command",
-            "command": "~/.claude/hooks/secret-leak-detector.sh"
-          }
+          { "type": "command", "command": "~/.claude/hooks/secret-leak-detector.sh" }
         ]
       }
     ]

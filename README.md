@@ -18,6 +18,19 @@ When Claude Code tries to install a package, this system:
 
 No API keys required. All three databases are free and public. Zero dependencies (Python stdlib only).
 
+## How This Compares
+
+Every other security tool for AI coding assistants scans what is already installed. This one blocks the bad package before it ever reaches your machine.
+
+| Tool | What it does | Gap |
+|------|-------------|-----|
+| mcp-scan (Stytch) | Audits installed MCP server configs | Post-install audit only |
+| AgentSeal | Scans MCP configs for prompt injection | Config audit, not install blocking |
+| AgentAuditKit | 77-rule scanner with SARIF output | CI/CD integration, not real-time |
+| Endor Labs | Dependency vetting for AI code | Enterprise SaaS, not open source |
+
+**Our approach:** Real-time interception at the moment the AI agent suggests `pip install` / `npm install`. Three databases checked, decision made, install blocked or allowed — before anything touches your system.
+
 ## Quick Start
 
 ### Clone and install
@@ -32,8 +45,9 @@ Or manually:
 
 ```bash
 cp dependency_security_check.py ~/.claude/
-mkdir -p ~/.claude/hooks
+mkdir -p ~/.claude/hooks ~/.claude/agents
 cp hooks/*.sh ~/.claude/hooks/
+cp agents/*.md ~/.claude/agents/
 ```
 
 Then merge the hooks from `settings-template.json` into your `~/.claude/settings.json`.
@@ -48,6 +62,10 @@ Then merge the hooks from `settings-template.json` into your `~/.claude/settings
 | `hooks/block-dangerous-git.sh` | Blocks force push, hook skipping, destructive operations |
 | `hooks/secret-leak-detector.sh` | Detects API keys, AWS creds, JWTs, passwords in written files |
 | `hooks/protect-sensitive-files.sh` | Blocks reading .env, credentials/, SSH keys |
+| `hooks/gitleaks-pre-write.sh` | Scans content with gitleaks before Write — blocks secrets before they reach disk |
+| `hooks/pii-redaction-gate.sh` | Blocks PII (emails, credit cards, IBAN) in prompts before the model sees them |
+| `agents/security-red-team.md` | Offensive security agent — OWASP, supply chain, prompt injection testing |
+| `agents/security-blue-team.md` | Defensive security agent — validates hooks, posture, compliance |
 | `settings-template.json` | Ready-to-use Claude Code settings with all hooks wired up |
 | `install.sh` | One-command installer |
 
@@ -81,11 +99,37 @@ Output: JSON on stdout (machine parsing), human-readable on stderr.
 
 AI coding assistants install packages on your behalf every day. Each install is a supply chain decision:
 
-- **LiteLLM v1.82.8** was compromised with a credential stealer
-- **xz-utils** had a backdoor that nearly made it into every Linux distro
-- **event-stream** was hijacked to steal Bitcoin wallets
+- **LiteLLM v1.82.8** was compromised with a credential stealer (March 2026)
+- **axios npm** was hijacked in a DPRK-linked attack (March 2026)
+- **Slopsquatting** — 20% of LLM-recommended packages don't exist, creating hijack opportunities ([USENIX 2025](https://arxiv.org/abs/2504.08538))
+- **OWASP LLM03:2025** — Supply Chain is now a formal vulnerability category
 
 Your AI assistant does not check for any of this. This project does.
+
+## Red Team / Blue Team Agents
+
+This repo includes two security agent definitions you can use with Claude Code's Agent tool:
+
+**Red Team** (`agents/security-red-team.md`) — Offensive. Probes your code for:
+- OWASP Top 10 vulnerabilities
+- Supply chain risks (unpinned deps, typosquatting)
+- Secrets in code and git history (via gitleaks)
+- Prompt injection in Claude configs
+- Insecure file permissions
+
+**Blue Team** (`agents/security-blue-team.md`) — Defensive. Validates that:
+- All security hooks are installed and wired
+- Gitignore covers sensitive files
+- Credential files have proper permissions (600)
+- Dependencies are free of known CVEs
+- Claude Code settings aren't overly permissive
+
+Copy them to `.claude/agents/` and invoke via the Agent tool for on-demand security assessments.
+
+## Prerequisites
+
+- **gitleaks** (required for `gitleaks-pre-write.sh`): `brew install gitleaks`
+- **jq** (required for all hooks): usually pre-installed on macOS
 
 ## Related
 
