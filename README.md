@@ -1,6 +1,6 @@
 # Claude Code Security
 
-Security-first wrapper for the package installs Claude Code runs on your behalf. 
+Security-first wrapper for the package installs Claude Code runs on your behalf.
 Every `pip install`, `npm install`, and `brew install` your AI coding assistant suggests gets checked against 3 vulnerability databases before it touches your system, so you never blindly pull in a known CVE.
 
 ## Why
