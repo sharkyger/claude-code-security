@@ -1,0 +1,30 @@
+name: Feature request
+description: Suggest a new hook, agent, or capability
+labels: [enhancement]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: What problem does this solve?
+      description: Describe the use case or pain point. Concrete examples help.
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed solution
+      description: How should the tool behave? If it's a new hook, what trigger event and what does it gate?
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered
+      description: Other approaches you thought about, and why they don't fit.
+  - type: checkboxes
+    id: contributions
+    attributes:
+      label: Are you willing to help?
+      options:
+        - label: I'd like to submit a PR for this
+        - label: I can help test

@@ -1,0 +1,52 @@
+name: Hook blocked legitimate input
+description: A security hook fired on something it shouldn't have
+labels: [false-positive, hook-misfire]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Hook misfires usually come from heuristic patterns that match too broadly — secret detection patterns hitting non-secret strings, command pattern matches catching legitimate variants, etc.
+
+        Please include enough detail that the fix can be tested.
+  - type: dropdown
+    id: hook
+    attributes:
+      label: Which hook fired?
+      options:
+        - dependency-security-gate.sh (blocked an install)
+        - block-dangerous-bash.sh (blocked a command)
+        - block-dangerous-git.sh (blocked a git operation)
+        - secret-leak-detector.sh (blocked content as a secret)
+        - protect-sensitive-files.sh (blocked file access)
+        - gitleaks-pre-write.sh (blocked write as containing secrets)
+        - pii-redaction-gate.sh (blocked content as PII)
+        - Not sure / multiple
+    validations:
+      required: true
+  - type: textarea
+    id: blocked-input
+    attributes:
+      label: What was blocked?
+      description: The command, file path, or content that triggered the hook. **Sanitize any actual secrets before pasting.**
+      render: shell
+    validations:
+      required: true
+  - type: textarea
+    id: hook-output
+    attributes:
+      label: Hook output / rejection reason
+      render: shell
+    validations:
+      required: true
+  - type: textarea
+    id: why-legit
+    attributes:
+      label: Why this is legitimate
+      description: Explain why the input shouldn't have been blocked.
+    validations:
+      required: true
+  - type: textarea
+    id: workaround
+    attributes:
+      label: Workaround used (if any)
+      description: How did you proceed? Disabled the hook? Reworded the input to avoid the trigger?
