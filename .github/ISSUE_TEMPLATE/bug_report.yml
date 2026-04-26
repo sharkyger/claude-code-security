@@ -1,0 +1,61 @@
+name: Bug report
+description: Something doesn't work the way it should
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for reporting. If a hook blocked something it shouldn't have, please use the **"Hook blocked legitimate input"** template instead.
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened?
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: What did you expect to happen?
+    validations:
+      required: true
+  - type: textarea
+    id: reproduce
+    attributes:
+      label: Steps to reproduce
+      placeholder: |
+        1. Install via `bash install.sh`
+        2. Run / ask Claude Code to do `<command>`
+        3. See output
+    validations:
+      required: true
+  - type: input
+    id: install-source
+    attributes:
+      label: How did you install the tool?
+      placeholder: e.g. install.sh on 2026-04-26, or git clone of commit abc123
+    validations:
+      required: true
+  - type: input
+    id: claude-version
+    attributes:
+      label: Claude Code version
+      description: Output of `claude --version`
+    validations:
+      required: true
+  - type: dropdown
+    id: platform
+    attributes:
+      label: Platform
+      options:
+        - macOS Apple Silicon
+        - macOS Intel
+        - Linux
+        - Windows (WSL)
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: Relevant output / logs
+      description: Paste the full hook output. Use code blocks.
+      render: shell
