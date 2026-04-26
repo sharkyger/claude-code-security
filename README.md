@@ -1,8 +1,20 @@
 # Claude Code Security
 
-**Supply chain security for Anthropic Claude Code.** Every pip install, npm install, and brew install your AI coding assistant runs gets checked against 3 vulnerability databases before execution.
+Security-first wrapper for the package installs Claude Code runs on your behalf.
+Every `pip install`, `npm install`, and `brew install` your AI coding assistant suggests gets checked against 3 vulnerability databases before it touches your system, so you never blindly pull in a known CVE.
 
-> Your AI assistant installs packages on your machine. Nobody is checking what is in them. Until now.
+## Why
+
+Claude Code can install packages for you, but it doesn't check whether those packages have known security issues. 
+Most of the time that's fine. 
+Sometimes it isn't.
+
+This adds a security gate at the hook level: 
+it intercepts every install your AI assistant tries to run, 
+queries three public vulnerability databases, 
+checks whether the *target version* is actually affected, 
+and only lets the install proceed if it comes back clean. 
+Packages with known vulnerabilities are blocked and listed separately.
 
 ## What This Does
 
@@ -16,11 +28,14 @@ When Claude Code tries to install a package, this system:
 3. **Blocks** the install if vulnerabilities are found
 4. **Allows** it through if clean
 
-No API keys required. All three databases are free and public. Zero dependencies (Python stdlib only).
+No API keys required. 
+All three databases are free and public. 
+Zero dependencies (Python stdlib only).
 
 ## How This Compares
 
-Every other security tool for AI coding assistants scans what is already installed. This one blocks the bad package before it ever reaches your machine.
+Every other security tool for AI coding assistants scans what is already installed. 
+This one blocks the bad package before it ever reaches your machine.
 
 | Tool | What it does | Gap |
 |------|-------------|-----|
@@ -29,7 +44,9 @@ Every other security tool for AI coding assistants scans what is already install
 | AgentAuditKit | 77-rule scanner with SARIF output | CI/CD integration, not real-time |
 | Endor Labs | Dependency vetting for AI code | Enterprise SaaS, not open source |
 
-**Our approach:** Real-time interception at the moment the AI agent suggests `pip install` / `npm install`. Three databases checked, decision made, install blocked or allowed — before anything touches your system.
+**Our approach:** 
+Real-time interception at the moment the AI agent suggests `pip install` / `npm install`. 
+Three databases checked, decision made, install blocked or allowed — before anything touches your system.
 
 ## Quick Start
 
@@ -97,7 +114,8 @@ Output: JSON on stdout (machine parsing), human-readable on stderr.
 
 ## Why This Matters
 
-AI coding assistants install packages on your behalf every day. Each install is a supply chain decision:
+AI coding assistants install packages on your behalf every day. 
+Each install is a supply chain decision:
 
 - **LiteLLM v1.82.8** was compromised with a credential stealer (March 2026)
 - **axios npm** was hijacked in a DPRK-linked attack (March 2026)
@@ -110,14 +128,18 @@ Your AI assistant does not check for any of this. This project does.
 
 This repo includes two security agent definitions you can use with Claude Code's Agent tool:
 
-**Red Team** (`agents/security-red-team.md`) — Offensive. Probes your code for:
+**Red Team** (`agents/security-red-team.md`) — Offensive. 
+
+Probes your code for:
 - OWASP Top 10 vulnerabilities
 - Supply chain risks (unpinned deps, typosquatting)
 - Secrets in code and git history (via gitleaks)
 - Prompt injection in Claude configs
 - Insecure file permissions
 
-**Blue Team** (`agents/security-blue-team.md`) — Defensive. Validates that:
+**Blue Team** (`agents/security-blue-team.md`) — Defensive. 
+
+Validates that:
 - All security hooks are installed and wired
 - Gitignore covers sensitive files
 - Credential files have proper permissions (600)
@@ -129,6 +151,7 @@ Copy them to `.claude/agents/` and invoke via the Agent tool for on-demand secur
 ## Prerequisites
 
 - **gitleaks** (required for `gitleaks-pre-write.sh`): `brew install gitleaks`
+  (or `brew safe-install gitleaks` if you have [homebrew-safe-upgrade](https://github.com/sharkyger/homebrew-safe-upgrade) installed — gates the install through 3 CVE databases first)
 - **jq** (required for all hooks): usually pre-installed on macOS
 
 ## Related
