@@ -25,7 +25,7 @@ git clone https://github.com/sharkyger/claude-code-security.git
 cd claude-code-security
 ```
 
-The hooks are bash. The vulnerability checker is Python (stdlib only, no requirements file).
+The hooks are bash. The vulnerability checker is Python (no requirements file; `certifi` is used when available for SSL on macOS, otherwise the system CA bundle).
 
 Lint the hook scripts:
 
