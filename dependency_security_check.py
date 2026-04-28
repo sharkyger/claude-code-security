@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Dependency Security Check — queries vulnerability databases before any install.
+Dependency Security Check — queries 3 vulnerability databases before any install.
 
 Sources:
   1. OSV.dev (Google) — primary, supports version filtering natively
@@ -10,9 +10,10 @@ Sources:
 Usage:
   python3 dependency_security_check.py <ecosystem> <package_name> [version]
 
-If version is not provided, the script resolves the latest version from PyPI/npm.
 Ecosystems: pip, npm, composer, cargo, go, maven, gem, brew
 Exit codes: 0 = clean, 1 = vulnerabilities found, 2 = error
+
+No API keys required. All three databases are free and public.
 """
 
 import json
@@ -23,7 +24,7 @@ import urllib.error
 import urllib.parse
 import urllib.request
 
-# Build SSL context with certifi bundle (macOS Python needs this)
+# Build SSL context — use certifi bundle if available (needed on macOS)
 try:
     import certifi
 
@@ -31,13 +32,15 @@ try:
 except ImportError:
     SSL_CONTEXT = ssl.create_default_context()
 
+USER_AGENT = "homebrew-safe-upgrade/1.0"
+
 
 def _urlopen(req, timeout=15):
     """Open URL with proper SSL context."""
     return urllib.request.urlopen(req, timeout=timeout, context=SSL_CONTEXT)
 
 
-# Map our ecosystem names to each source's expected format
+# Map ecosystem names to each source's expected format
 ECOSYSTEM_MAP = {
     "osv": {
         "pip": "PyPI",
@@ -67,13 +70,13 @@ def resolve_latest_version(package_name, ecosystem):
     try:
         if ecosystem == "pip":
             url = f"https://pypi.org/pypi/{urllib.parse.quote(package_name)}/json"
-            req = urllib.request.Request(url, headers={"User-Agent": "dependency-security-check/2.0"})
+            req = urllib.request.Request(url, headers={"User-Agent": USER_AGENT})
             with _urlopen(req, timeout=8) as resp:
                 data = json.loads(resp.read())
             return data.get("info", {}).get("version")
         elif ecosystem == "npm":
             url = f"https://registry.npmjs.org/{urllib.parse.quote(package_name)}/latest"
-            req = urllib.request.Request(url, headers={"User-Agent": "dependency-security-check/2.0"})
+            req = urllib.request.Request(url, headers={"User-Agent": USER_AGENT})
             with _urlopen(req, timeout=8) as resp:
                 data = json.loads(resp.read())
             return data.get("version")
@@ -88,10 +91,8 @@ def parse_version(v):
         return ()
     # Strip leading 'v' or '=' prefixes
     v = re.sub(r"^[v=]+", "", v.strip())
-    # Split on dots and convert to ints where possible
     parts = []
     for p in v.split("."):
-        # Extract leading digits
         m = re.match(r"(\d+)", p)
         if m:
             parts.append(int(m.group(1)))
@@ -113,7 +114,6 @@ def version_in_range(version, range_str):
     if not v:
         return True
 
-    # Split on comma for compound ranges like ">= 1.0, < 2.0"
     conditions = [c.strip() for c in range_str.split(",")]
 
     for cond in conditions:
@@ -121,10 +121,8 @@ def version_in_range(version, range_str):
         if not cond:
             continue
 
-        # Parse operator and version
         m = re.match(r"([<>=!]+)\s*([\d][\d.]*\w*)", cond)
         if not m:
-            # Exact version like "1.2.3"
             if parse_version(cond) == v:
                 return True
             continue
@@ -162,20 +160,20 @@ def query_osv(package_name, ecosystem, version=None):
     try:
         payload = {"package": {"name": package_name, "ecosystem": osv_ecosystem}}
         if version:
-            payload["version"] = version  # OSV filters server-side when version is provided
+            payload["version"] = version
         body = json.dumps(payload).encode()
         req = urllib.request.Request(
-            "https://api.osv.dev/v1/query", data=body, headers={"Content-Type": "application/json"}
+            "https://api.osv.dev/v1/query",
+            data=body,
+            headers={"Content-Type": "application/json"},
         )
         with _urlopen(req) as resp:
             data = json.loads(resp.read())
 
         for vuln in data.get("vulns", []):
-            # If we passed a version, OSV already filtered — these ARE affecting us
             severity_info = vuln.get("database_specific", {})
             severity = severity_info.get("severity", "UNKNOWN")
 
-            # Try to get CVSS from severity list
             for s in vuln.get("severity", []):
                 if s.get("type") == "CVSS_V3" and "CRITICAL" in str(severity_info):
                     severity = "CRITICAL"
@@ -220,7 +218,8 @@ def query_github(package_name, ecosystem, version=None):
             f"&per_page=20"
         )
         req = urllib.request.Request(
-            url, headers={"Accept": "application/vnd.github+json", "User-Agent": "dependency-security-check/2.0"}
+            url,
+            headers={"Accept": "application/vnd.github+json", "User-Agent": USER_AGENT},
         )
         with _urlopen(req) as resp:
             data = json.loads(resp.read())
@@ -228,9 +227,8 @@ def query_github(package_name, ecosystem, version=None):
         for adv in data:
             severity = adv.get("severity", "unknown").upper()
 
-            # Check if our version is actually in the vulnerable range
             if version:
-                dominated = False
+                not_affected = False
                 for vuln_pkg in adv.get("vulnerabilities", []):
                     pkg_info = vuln_pkg.get("package", {})
                     if pkg_info.get("name", "").lower() != package_name.lower():
@@ -244,18 +242,16 @@ def query_github(package_name, ecosystem, version=None):
                     else:
                         patched_ver = None
 
-                    # If there's a patched version and we're >= it, we're safe
                     if patched_ver and parse_version(version) >= parse_version(patched_ver):
-                        dominated = True
+                        not_affected = True
                         break
 
-                    # Check the vulnerable_version_range
                     if vrange and not version_in_range(version, vrange):
-                        dominated = True
+                        not_affected = True
                         break
 
-                if dominated:
-                    continue  # Skip — our version is patched/not affected
+                if not_affected:
+                    continue
 
             findings.append(
                 {
@@ -283,25 +279,8 @@ def query_nvd(package_name, ecosystem, version=None):
     """Query NIST NVD — keyword search with version filtering via CPE match."""
     findings = []
 
-    # NVD keyword search is too noisy for common words — skip short/ambiguous names
-    if len(package_name) < 4 or package_name.lower() in (
-        "pip",
-        "rich",
-        "six",
-        "lxml",
-        "jinja2",
-        "flask",
-        "django",
-        "requests",
-        "click",
-        "pytest",
-        "black",
-        "mypy",
-        "ruff",
-    ):
-        # For well-known packages, OSV + GitHub already cover them thoroughly.
-        # NVD keyword search on these names returns unrelated CVEs (Windows pipes,
-        # rich text format, etc.)
+    # NVD keyword search is too noisy for short/ambiguous names
+    if len(package_name) < 4:
         return findings
 
     try:
@@ -311,43 +290,54 @@ def query_nvd(package_name, ecosystem, version=None):
             f"&keywordExactMatch"
             f"&resultsPerPage=10"
         )
-        req = urllib.request.Request(url, headers={"User-Agent": "dependency-security-check/2.0"})
+        req = urllib.request.Request(url, headers={"User-Agent": USER_AGENT})
         with _urlopen(req) as resp:
             data = json.loads(resp.read())
 
         for vuln in data.get("vulnerabilities", []):
             cve = vuln.get("cve", {})
             cve_id = cve.get("id", "unknown")
+
+            # Skip disputed CVEs — upstream doesn't consider them valid
+            vuln_status = cve.get("vulnStatus", "")
+            if "DISPUTED" in vuln_status.upper() or "REJECTED" in vuln_status.upper():
+                continue
+
             desc_list = cve.get("descriptions", [])
             desc = next((d["value"] for d in desc_list if d["lang"] == "en"), "No description")
 
-            # Filter out CVEs that match keyword but are about different software.
-            # A CVE is relevant only if the description identifies our package as the
-            # vulnerable component, not just mentioning it as a dependency/tool used.
-            # Use word-boundary regex to avoid substring false positives
-            # e.g. "claude-code" must not match "claude-code-router"
-            desc_lower = desc.lower()
-            pkg_lower = package_name.lower()
-            pkg_nohyphen = pkg_lower.replace("-", "")
-
-            pkg_pattern = re.compile(r"(?<![a-z0-9\-])" + re.escape(pkg_lower) + r"(?![a-z0-9\-])")
-            pkg_nohyphen_pattern = re.compile(r"(?<![a-z0-9])" + re.escape(pkg_nohyphen) + r"(?![a-z0-9])")
-
-            # Must mention the package name as a whole word
-            if not pkg_pattern.search(desc_lower) and not pkg_nohyphen_pattern.search(desc_lower):
+            # Skip CVEs explicitly marked as disputed in description
+            if desc.strip().startswith("** DISPUTED **"):
                 continue
 
-            # Reject if the first sentence names a DIFFERENT product as the subject.
-            # Pattern: "ProductName is a ... " or "ProductName before version ..."
-            # If the CVE subject is not our package, it's a false positive.
-            first_sentence = desc.split(". ")[0].split(" is ")[0].split(" before ")[0].split(" through ")[0].strip()
+            # Filter out CVEs that mention the keyword but are about different software.
+            # Use boundary matching that prevents "claude-code" from matching
+            # "claude-code-router" — hyphens connect compound package names, so
+            # the match must not be followed or preceded by [-\w].
+            desc_lower = desc.lower()
+            pkg_lower = package_name.lower()
+            pkg_nodash = pkg_lower.replace("-", "")
+
+            pkg_re = re.compile(r"(?<![a-z0-9\-])" + re.escape(pkg_lower) + r"(?![a-z0-9\-])")
+            pkg_nodash_re = re.compile(r"(?<![a-z0-9])" + re.escape(pkg_nodash) + r"(?![a-z0-9])")
+
+            if not pkg_re.search(desc_lower) and not pkg_nodash_re.search(desc_lower):
+                continue
+
+            # Reject if the first sentence names a different product as the subject
+            first_sentence = (
+                desc.split(". ")[0]
+                .split(" is ")[0]
+                .split(" before ")[0]
+                .split(" through ")[0]
+                .strip()
+            )
             first_word = first_sentence.split()[0] if first_sentence.split() else ""
-            first_word_lower = first_word.lower()
-            # If the first word/product name doesn't match our package, likely a false positive
+            first_lower = first_word.lower()
             if (
-                first_word_lower != pkg_lower
-                and first_word_lower != pkg_nohyphen
-                and not pkg_pattern.search(first_word_lower)
+                first_lower != pkg_lower
+                and first_lower != pkg_nodash
+                and not pkg_re.search(first_lower)
             ):
                 continue
 
@@ -361,29 +351,40 @@ def query_nvd(package_name, ecosystem, version=None):
                     score = cvss.get("baseScore", score)
                     break
 
-            # Version filtering: check CPE matches if available
+            # Version filtering via CPE matches
             if version:
                 affected = False
                 has_cpe = False
+                has_any_cpe = False
+                # Distro-specific vendors whose package versions don't match upstream
+                distro_vendors = {
+                    "opensuse",
+                    "suse",
+                    "redhat",
+                    "debian",
+                    "ubuntu",
+                    "canonical",
+                    "fedoraproject",
+                    "oracle",
+                    "centos",
+                }
                 configurations = cve.get("configurations", [])
                 for config in configurations:
                     for node in config.get("nodes", []):
                         for cpe in node.get("cpeMatch", []):
                             if not cpe.get("vulnerable", False):
                                 continue
-                            # Only consider CPEs for our package, not unrelated
-                            # vendors (NetApp, Oracle, etc.) bundling the same lib
+                            has_any_cpe = True
+                            # Skip distro/OS-specific CPEs — their versions don't match upstream
                             cpe_str = cpe.get("criteria", "")
                             cpe_parts = cpe_str.split(":")
                             if len(cpe_parts) >= 5:
-                                cpe_product = cpe_parts[4].lower()
+                                cpe_type = cpe_parts[2].lower()  # a=app, o=os, h=hw
                                 cpe_vendor = cpe_parts[3].lower()
-                                pkg_check = pkg_lower.replace("-", "_")
-                                if (
-                                    pkg_check not in cpe_product
-                                    and cpe_product not in pkg_check
-                                    and pkg_check not in cpe_vendor
-                                ):
+                                # OS-type CPEs are distro packages, not upstream
+                                if cpe_type == "o":
+                                    continue
+                                if cpe_vendor in distro_vendors:
                                     continue
                             has_cpe = True
                             ver_end_exc = cpe.get("versionEndExcluding")
@@ -394,13 +395,21 @@ def query_nvd(package_name, ecosystem, version=None):
                             if ver_end_exc or ver_end_inc or ver_start_inc or ver_start_exc:
                                 # Range-based CPE — check if our version falls within
                                 in_range = True
-                                if ver_start_inc and parse_version(version) < parse_version(ver_start_inc):
+                                if ver_start_inc and parse_version(version) < parse_version(
+                                    ver_start_inc
+                                ):
                                     in_range = False
-                                if ver_start_exc and parse_version(version) <= parse_version(ver_start_exc):
+                                if ver_start_exc and parse_version(version) <= parse_version(
+                                    ver_start_exc
+                                ):
                                     in_range = False
-                                if ver_end_exc and parse_version(version) >= parse_version(ver_end_exc):
+                                if ver_end_exc and parse_version(version) >= parse_version(
+                                    ver_end_exc
+                                ):
                                     in_range = False
-                                if ver_end_inc and parse_version(version) > parse_version(ver_end_inc):
+                                if ver_end_inc and parse_version(version) > parse_version(
+                                    ver_end_inc
+                                ):
                                     in_range = False
                                 if in_range:
                                     affected = True
@@ -420,14 +429,45 @@ def query_nvd(package_name, ecosystem, version=None):
                 if has_cpe and not affected:
                     continue
 
-                # Fallback: if no CPE data, try to extract version range from description
+                # All CPEs were distro-specific — not relevant to upstream/Homebrew
+                if has_any_cpe and not has_cpe:
+                    continue
+
+                # Fallback: if no CPE data, try to extract version range from description.
+                # GitHub-style advisories often read "Starting in version X and prior to
+                # version Y" — handle the optional "version"/"v" prefix and inclusive vs
+                # exclusive boundaries.
                 if not has_cpe:
-                    # Match patterns like "through X.Y.Z", "before X.Y.Z", "up to X.Y.Z"
-                    end_match = re.search(r"(?:through|before|up to|prior to)\s+([\d]+(?:\.[\d]+)*)", desc)
-                    if end_match:
-                        upper = parse_version(end_match.group(1))
+                    v_re = r"(?:version\s+)?v?([\d]+(?:\.[\d]+)*)"
+
+                    # Exclusive upper bound: fixed at the matched version
+                    end_exc = re.search(
+                        rf"(?:before|prior to|up to but not including|fixed in|patched in)\s+{v_re}",
+                        desc,
+                        re.IGNORECASE,
+                    )
+                    if end_exc:
+                        upper = parse_version(end_exc.group(1))
+                        if upper and parse_version(version) >= upper:
+                            continue  # version is at or above the fix — not affected
+
+                    # Inclusive upper bound: last affected version
+                    end_inc = re.search(rf"\bthrough\s+{v_re}", desc, re.IGNORECASE)
+                    if end_inc:
+                        upper = parse_version(end_inc.group(1))
                         if upper and parse_version(version) > upper:
-                            continue  # Our version is above the affected range
+                            continue
+
+                    # Lower bound: affected starts at this version
+                    start_inc = re.search(
+                        rf"(?:starting in|introduced in|since)\s+{v_re}",
+                        desc,
+                        re.IGNORECASE,
+                    )
+                    if start_inc:
+                        lower = parse_version(start_inc.group(1))
+                        if lower and parse_version(version) < lower:
+                            continue
 
             findings.append(
                 {
@@ -472,51 +512,73 @@ def deduplicate(findings):
 
 def main():
     if len(sys.argv) < 3:
-        print("Usage: dependency_security_check.py <ecosystem> <package> [version]", file=sys.stderr)
+        print(
+            "Usage: dependency_security_check.py <ecosystem> <package> [version]",
+            file=sys.stderr,
+        )
         sys.exit(2)
 
     ecosystem = sys.argv[1].lower()
     package_name = sys.argv[2]
     version = sys.argv[3] if len(sys.argv) > 3 else None
 
-    valid_ecosystems = ["pip", "npm", "composer", "cargo", "go", "maven", "gem", "brew"]
-    if ecosystem not in valid_ecosystems:
-        print(f"Unknown ecosystem: {ecosystem}. Valid: {', '.join(valid_ecosystems)}", file=sys.stderr)
+    # Input validation — prevent SSRF via crafted package names
+    if not re.match(r"^[a-zA-Z0-9@._/\-]+$", package_name):
+        print(f"Invalid package name: {package_name}", file=sys.stderr)
+        sys.exit(2)
+    if version and not re.match(r"^[a-zA-Z0-9._\-+]+$", version):
+        print(f"Invalid version: {version}", file=sys.stderr)
         sys.exit(2)
 
-    # Resolve version if not provided
+    valid_ecosystems = ["pip", "npm", "composer", "cargo", "go", "maven", "gem", "brew"]
+    if ecosystem not in valid_ecosystems:
+        print(
+            f"Unknown ecosystem: {ecosystem}. Valid: {', '.join(valid_ecosystems)}",
+            file=sys.stderr,
+        )
+        sys.exit(2)
+
     if not version:
         version = resolve_latest_version(package_name, ecosystem)
 
-    print(f"\n🔒 Security check: {package_name} ({ecosystem})", file=sys.stderr)
+    print(f"\nSecurity check: {package_name} ({ecosystem})", file=sys.stderr)
     if version:
-        print(f"   Version: {version}", file=sys.stderr)
+        print(f"  Version: {version}", file=sys.stderr)
     else:
-        print("   Version: unknown (checking all known CVEs)", file=sys.stderr)
-    print("   Querying 3 vulnerability databases (NVD + OSV + GitHub)...\n", file=sys.stderr)
+        print("  Version: unknown (checking all known CVEs)", file=sys.stderr)
+    print(
+        "  Querying 3 vulnerability databases (NVD + OSV + GitHub)...\n",
+        file=sys.stderr,
+    )
 
-    # Query all sources — pass version for filtering
     all_findings = []
     all_findings.extend(query_osv(package_name, ecosystem, version))
     all_findings.extend(query_github(package_name, ecosystem, version))
     all_findings.extend(query_nvd(package_name, ecosystem, version))
 
-    # Separate errors from real findings
     errors = [f for f in all_findings if f["id"] in ("ERROR", "SKIP")]
     vulns = [f for f in all_findings if f["id"] not in ("ERROR", "SKIP")]
     vulns = deduplicate(vulns)
 
-    # Sort by severity
-    severity_order = {"CRITICAL": 0, "HIGH": 1, "MEDIUM": 2, "LOW": 3, "MODERATE": 3, "UNKNOWN": 4}
+    severity_order = {
+        "CRITICAL": 0,
+        "HIGH": 1,
+        "MEDIUM": 2,
+        "LOW": 3,
+        "MODERATE": 3,
+        "UNKNOWN": 4,
+    }
     vulns.sort(key=lambda f: severity_order.get(f["severity"], 5))
 
-    # Report errors
     for e in errors:
-        print(f"   ⚠️  {e['source']}: {e['summary']}", file=sys.stderr)
+        print(f"  Warning: {e['source']}: {e['summary']}", file=sys.stderr)
 
     if not vulns:
         sources_ok = 3 - len(errors)
-        print(f"   ✅ No known vulnerabilities found ({sources_ok}/3 sources checked)", file=sys.stderr)
+        print(
+            f"  No known vulnerabilities found ({sources_ok}/3 sources checked)",
+            file=sys.stderr,
+        )
         json.dump(
             {
                 "status": "clean",
@@ -530,14 +592,17 @@ def main():
         sys.exit(0)
     else:
         critical_high = [v for v in vulns if v["severity"] in ("CRITICAL", "HIGH")]
-        print(f"   🚨 {len(vulns)} vulnerabilities found ({len(critical_high)} critical/high):\n", file=sys.stderr)
+        print(
+            f"  {len(vulns)} vulnerabilities found ({len(critical_high)} critical/high):\n",
+            file=sys.stderr,
+        )
 
         for v in vulns:
-            icon = "🔴" if v["severity"] in ("CRITICAL", "HIGH") else "🟡" if v["severity"] == "MEDIUM" else "⚪"
+            severity_label = v["severity"]
             score_str = f" (CVSS {v['score']})" if v["score"] > 0 else ""
-            print(f"   {icon} [{v['severity']}] {v['id']}{score_str}", file=sys.stderr)
-            print(f"      Source: {v['source']}", file=sys.stderr)
-            print(f"      {v['summary']}\n", file=sys.stderr)
+            print(f"  [{severity_label}] {v['id']}{score_str}", file=sys.stderr)
+            print(f"    Source: {v['source']}", file=sys.stderr)
+            print(f"    {v['summary']}\n", file=sys.stderr)
 
         json.dump(
             {
