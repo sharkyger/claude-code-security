@@ -21,12 +21,14 @@ Packages with known vulnerabilities are blocked and listed separately.
 When Claude Code tries to install a package, this system:
 
 1. **Intercepts** the install command (pip, npm, composer, cargo, go, gem, brew)
-2. **Queries 3 databases** for known vulnerabilities:
+2. **Resolves the full transitive tree** for pip / npm / composer / gem via the package manager's own dry-run mode — every direct and indirect dependency gets checked, not just the named package. Use `--no-deps` to limit the check to the top-level package
+3. **Queries 3 databases** for known vulnerabilities:
    - [NIST NVD](https://nvd.nist.gov/) - US government vulnerability database
-   - [OSV.dev](https://osv.dev/) - Google open source vulnerability database
+   - [OSV.dev](https://osv.dev/) - Google open source vulnerability database, batch-queried for the resolved tree
    - [GitHub Advisory Database](https://github.com/advisories) - GitHub security advisories
-3. **Blocks** the install if vulnerabilities are found
-4. **Allows** it through if clean
+4. **Holds fresh versions** (default `--min-age 3`) for pip + npm — if a package's latest release is younger than N days, the install is held. Defends against typosquat / zero-hour publish attacks where a malicious version goes live minutes after credential theft, before any CVE database knows. Disable with `--min-age 0`
+5. **Fails closed on demand** — set `STRICT_FAIL_CLOSED=1` to turn database errors into hard blocks (default is best-effort allow when at least one DB returns clean)
+6. **Blocks** the install if vulnerabilities are found, **allows** it through if clean
 
 No API keys required. 
 All three databases are free and public. 
@@ -104,11 +106,15 @@ python3 ~/.claude/dependency_security_check.py brew openssl 3.2.0
 
 The scanner queries all 3 databases and cross-references results:
 
-- **OSV.dev** - native version filtering (most accurate for pip/npm)
+- **OSV.dev** - native version filtering (most accurate for pip/npm), batch-queried for the resolved transitive tree
 - **GitHub Advisory** - checks vulnerable_version_range and first_patched_version
-- **NIST NVD** - keyword search with CPE version matching, word-boundary filtering to avoid false positives
+- **NIST NVD** - keyword search with CPE version matching, word-boundary filtering to avoid false positives, distro-vendor CPE skip (debian/ubuntu/redhat etc. don't share upstream version numbers), DISPUTED CVE filter
 
 Version-aware: if you pass a version, only CVEs affecting that specific version are reported.
+
+Transitive resolution covers pip, npm, composer, gem out of the box (uses each manager's dry-run mode — no install side-effects). Brew, cargo, go, maven fall back to single-package checks.
+
+Input is validated against an allowlist regex before any network call to defend against SSRF via crafted package names.
 
 Output: JSON on stdout (machine parsing), human-readable on stderr.
 
