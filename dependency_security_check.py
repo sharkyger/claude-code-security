@@ -178,7 +178,6 @@ def resolve_latest_version(package_name, ecosystem):
             return data.get("version")
     except Exception:
         return None
-    return None
 
 
 def parse_version(v):
