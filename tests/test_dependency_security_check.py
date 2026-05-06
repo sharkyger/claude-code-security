@@ -178,3 +178,83 @@ def test_check_min_age_old_package_passes():
 def test_check_min_age_zero_disables():
     with patch.object(dsc, "get_release_age_days", return_value=0):
         assert dsc.check_min_age("foo", "1.0", "pip", min_age_days=0) is None
+
+
+# ─── STRICT_FAIL_CLOSED end-to-end ───────────────────────────────────────────
+
+
+def test_strict_fail_closed_blocks_when_set_and_errors_present(monkeypatch, tmp_path, capsys):
+    """STRICT_FAIL_CLOSED=1 + DB errors → exit 2."""
+    monkeypatch.setenv("STRICT_FAIL_CLOSED", "1")
+    monkeypatch.setattr(
+        "sys.argv",
+        ["dsc", "pip", "requests", "2.31.0", "--no-deps", "--min-age", "0"],
+    )
+
+    err_finding = [
+        {
+            "source": "OSV.dev",
+            "id": "ERROR",
+            "severity": "UNKNOWN",
+            "score": 0,
+            "summary": "timeout",
+        }
+    ]
+    with (
+        patch.object(dsc, "query_osv", return_value=err_finding),
+        patch.object(dsc, "query_github", return_value=[]),
+        patch.object(dsc, "query_nvd", return_value=[]),
+        pytest.raises(SystemExit) as exc_info,
+    ):
+        dsc.main()
+
+    assert exc_info.value.code == 2, "STRICT_FAIL_CLOSED + errors must exit 2"
+    captured = capsys.readouterr()
+    assert "STRICT_FAIL_CLOSED" in captured.err
+
+
+def test_strict_fail_closed_allows_when_unset_and_errors_present(monkeypatch):
+    """Default: errors present but no vulns → exit 0 (best-effort allow)."""
+    monkeypatch.delenv("STRICT_FAIL_CLOSED", raising=False)
+    monkeypatch.setattr(
+        "sys.argv",
+        ["dsc", "pip", "requests", "2.31.0", "--no-deps", "--min-age", "0"],
+    )
+
+    err_finding = [
+        {
+            "source": "OSV.dev",
+            "id": "ERROR",
+            "severity": "UNKNOWN",
+            "score": 0,
+            "summary": "timeout",
+        }
+    ]
+    with (
+        patch.object(dsc, "query_osv", return_value=err_finding),
+        patch.object(dsc, "query_github", return_value=[]),
+        patch.object(dsc, "query_nvd", return_value=[]),
+        pytest.raises(SystemExit) as exc_info,
+    ):
+        dsc.main()
+
+    assert exc_info.value.code == 0, "default posture: errors don't block a clean result"
+
+
+def test_strict_fail_closed_allows_when_set_but_no_errors(monkeypatch):
+    """STRICT_FAIL_CLOSED=1 + no errors + clean → still exit 0."""
+    monkeypatch.setenv("STRICT_FAIL_CLOSED", "1")
+    monkeypatch.setattr(
+        "sys.argv",
+        ["dsc", "pip", "requests", "2.31.0", "--no-deps", "--min-age", "0"],
+    )
+
+    with (
+        patch.object(dsc, "query_osv", return_value=[]),
+        patch.object(dsc, "query_github", return_value=[]),
+        patch.object(dsc, "query_nvd", return_value=[]),
+        pytest.raises(SystemExit) as exc_info,
+    ):
+        dsc.main()
+
+    assert exc_info.value.code == 0, "no errors + clean → allow regardless of STRICT_FAIL_CLOSED"

@@ -116,7 +116,7 @@ Transitive resolution covers pip, npm, composer, gem out of the box (uses each m
 
 Input is validated against an allowlist regex before any network call to defend against SSRF via crafted package names.
 
-Output: JSON on stdout (machine parsing), human-readable on stderr. Per-decision audit trail at `~/.claude/dependency-gate.log.jsonl`.
+Output: JSON on stdout (machine parsing), human-readable on stderr.
 
 ## Why This Matters
 

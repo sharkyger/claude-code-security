@@ -227,19 +227,12 @@ def version_in_range(version, range_str):
         ref = parse_version(ref_str)
 
         if (
-            op == "<"
-            and not (v < ref)
-            or op == "<="
-            and not (v <= ref)
-            or op == ">"
-            and not (v > ref)
-            or op == ">="
-            and not (v >= ref)
-            or op == "="
-            or op == "=="
-            and v != ref
-            or op == "!="
-            and v == ref
+            (op == "<" and not (v < ref))
+            or (op == "<=" and not (v <= ref))
+            or (op == ">" and not (v > ref))
+            or (op == ">=" and not (v >= ref))
+            or ((op == "=" or op == "==") and v != ref)
+            or (op == "!=" and v == ref)
         ):
             return False
 
@@ -682,7 +675,7 @@ def resolve_composer_deps(package_name, version=None):
     # No `minimum-stability` key — composer's default is "stable", and pinning
     # it here would cause valid pre-release version specs to be rejected.
     manifest = {
-        "name": "agency-system/dep-check",
+        "name": "claude-code-security/dep-check",
         "require": {package_name: constraint},
         "prefer-stable": True,
     }
