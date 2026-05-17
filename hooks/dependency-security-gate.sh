@@ -97,7 +97,7 @@ fi
 # SAFE_INSTALL_MIN_AGE. Unset = scanner default, "0" = disable freshness hold,
 # "7" = stricter hold. See README "Bypass / Override" section.
 MIN_AGE_ARGS=()
-if [ -n "${SAFE_INSTALL_MIN_AGE+x}" ]; then
+if [ -n "${SAFE_INSTALL_MIN_AGE:-}" ]; then
   MIN_AGE_ARGS=(--min-age "$SAFE_INSTALL_MIN_AGE")
 fi
 
