@@ -74,10 +74,19 @@ add the env var to your shell profile, or set it in your Claude Code
 }
 ```
 
-**Auto-bypass when you're already exposed:** if the *installed* version of a
-package has known CVEs, the freshness hold is automatically skipped for that
-package — so security patches still reach you even with the default 3-day
-hold. You don't need to disable the hold to receive a CVE fix.
+**Empty env var = unset.** Setting `SAFE_INSTALL_MIN_AGE=` (empty string) is
+treated the same as leaving it unset — the scanner's default 3-day hold
+applies. This avoids the footgun where a half-finished export in your shell
+profile silently disables the freshness defense.
+
+**When you genuinely need a CVE patch that just dropped:** the freshness
+hold can block a new release within its first 3 days even when that release
+fixes a CVE in your installed version. The hook does not have a CVE-aware
+auto-bypass — set `SAFE_INSTALL_MIN_AGE=0` for that install, then unset.
+(The standalone `brew safe-upgrade` wrapper in
+[homebrew-safe-upgrade](https://github.com/sharkyger/homebrew-safe-upgrade)
+*does* skip the freshness hold when the installed version has known CVEs;
+that logic lives in the brew wrapper, not in the scanner the hook calls.)
 
 The same `SAFE_INSTALL_MIN_AGE` variable is read by `mistral-code-security`,
 so one config value covers both AI-assistant tools.

@@ -119,6 +119,28 @@ def test_env_var_seven_passes_min_age_seven():
         assert "--min-age 7" in recorded, f"expected '--min-age 7' in args, got: {recorded!r}"
 
 
+def test_env_var_empty_string_behaves_like_unset():
+    """Empty SAFE_INSTALL_MIN_AGE must NOT pass --min-age "" to the scanner.
+
+    Regression guard: an earlier draft used ${VAR+x} which is set even for
+    empty values, causing every install to fail-closed with a confusing
+    argparse error. The fix uses ${VAR:-} which treats empty as unset, so
+    the scanner's own default applies.
+    """
+    with tempfile.TemporaryDirectory() as td:
+        td_path = Path(td)
+        hook = _setup_fake_layout(td_path)
+        argv_log = td_path / "argv.txt"
+        argv_log.touch()
+
+        result = _run_hook(hook, argv_log, {"SAFE_INSTALL_MIN_AGE": ""}, "pip install requests")
+        assert result.returncode == 0, f"empty env var should not block, got: {result.stderr}"
+        recorded = argv_log.read_text()
+        assert "--min-age" not in recorded, (
+            f"empty env var must behave like unset (no --min-age passed), got: {recorded!r}"
+        )
+
+
 def test_env_var_works_with_pinned_version():
     """Pinned-version path (line 107 in the hook) must also receive the flag."""
     with tempfile.TemporaryDirectory() as td:
