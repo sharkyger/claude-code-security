@@ -225,6 +225,15 @@ Copy them to `.claude/agents/` and invoke via the Agent tool for on-demand secur
 - [homebrew-safe-upgrade](https://github.com/sharkyger/homebrew-safe-upgrade) - Same scanner integrated into Homebrew upgrades
 - [mistral-code-cve-gate](https://github.com/sharkyger/mistral-code-cve-gate) - Same protection for Mistral AI coding tools
 
+## Sponsors
+
+This tool stays free and default-on thanks to the people and companies funding the maintenance time.
+
+<!-- sponsors -->
+<!-- sponsors -->
+
+[**Become a sponsor →**](https://github.com/sponsors/sharkyger)
+
 ## License
 
 MIT
