@@ -9,7 +9,7 @@ Only the latest released version is supported.
 **Do not open a public issue for security reports.**
 
 Use GitHub's private vulnerability reporting:
-https://github.com/sharkyger/claude-code-security/security/advisories/new
+https://github.com/sharkyger/claude-code-cve-gate/security/advisories/new
 
 You can expect an acknowledgement within 7 days.
 

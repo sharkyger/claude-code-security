@@ -89,7 +89,7 @@ if [ ! -f "$SCRIPT" ]; then
 fi
 if [ ! -f "$SCRIPT" ]; then
   echo "BLOCKED: dependency_security_check.py not found. Install it first." >&2
-  echo "See: https://github.com/sharkyger/claude-code-security" >&2
+  echo "See: https://github.com/sharkyger/claude-code-cve-gate" >&2
   exit 2
 fi
 
