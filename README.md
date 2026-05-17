@@ -229,8 +229,7 @@ Copy them to `.claude/agents/` and invoke via the Agent tool for on-demand secur
 
 This tool stays free and default-on thanks to the people and companies funding the maintenance time.
 
-<!-- sponsors -->
-<!-- sponsors -->
+<!-- sponsors -->No sponsors yet — [become the first](https://github.com/sponsors/sharkyger).<!-- sponsors -->
 
 [**Become a sponsor →**](https://github.com/sponsors/sharkyger)
 
