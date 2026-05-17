@@ -93,6 +93,14 @@ if [ ! -f "$SCRIPT" ]; then
   exit 2
 fi
 
+# Override the scanner's default --min-age (3 days) when the user sets
+# SAFE_INSTALL_MIN_AGE. Unset = scanner default, "0" = disable freshness hold,
+# "7" = stricter hold. See README "Bypass / Override" section.
+MIN_AGE_ARGS=()
+if [ -n "${SAFE_INSTALL_MIN_AGE+x}" ]; then
+  MIN_AGE_ARGS=(--min-age "$SAFE_INSTALL_MIN_AGE")
+fi
+
 BLOCKED=0
 for PKG in $PACKAGES; do
   [ -z "$PKG" ] && continue
@@ -104,9 +112,9 @@ for PKG in $PACKAGES; do
   fi
 
   if [ -n "$PKG_VERSION" ]; then
-    RESULT=$(python3 "$SCRIPT" "$ECOSYSTEM" "$PKG" "$PKG_VERSION" 2>&1)
+    RESULT=$(python3 "$SCRIPT" "$ECOSYSTEM" "$PKG" "$PKG_VERSION" "${MIN_AGE_ARGS[@]}" 2>&1)
   else
-    RESULT=$(python3 "$SCRIPT" "$ECOSYSTEM" "$PKG" 2>&1)
+    RESULT=$(python3 "$SCRIPT" "$ECOSYSTEM" "$PKG" "${MIN_AGE_ARGS[@]}" 2>&1)
   fi
   EXIT_CODE=$?
 

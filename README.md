@@ -26,13 +26,61 @@ When Claude Code tries to install a package, this system:
    - [NIST NVD](https://nvd.nist.gov/) - US government vulnerability database
    - [OSV.dev](https://osv.dev/) - Google open source vulnerability database, batch-queried for the resolved tree
    - [GitHub Advisory Database](https://github.com/advisories) - GitHub security advisories
-4. **Holds fresh versions** (default `--min-age 3`) for pip + npm — if a package's latest release is younger than N days, the install is held. Defends against typosquat / zero-hour publish attacks where a malicious version goes live minutes after credential theft, before any CVE database knows. Disable with `--min-age 0`
+4. **Holds fresh versions** (default 3 days) for pip + npm — if a package's latest release is younger than N days, the install is held. Defends against typosquat / zero-hour publish attacks where a malicious version goes live minutes after credential theft, before any CVE database knows. Override via `SAFE_INSTALL_MIN_AGE` env var (see **Bypass / Override** below)
 5. **Fails closed on demand** — set `STRICT_FAIL_CLOSED=1` to turn database errors into hard blocks (default is best-effort allow when at least one DB returns clean)
 6. **Blocks** the install if vulnerabilities are found, **allows** it through if clean
 
 No API keys required. 
 All three databases are free and public. 
 Zero dependencies (Python stdlib only).
+
+## Bypass / Override
+
+The 3-day freshness hold exists for typosquat / zero-hour publish defense.
+When you genuinely need a fresh release (security patch from upstream, urgent
+fix, known-good vendor release), override it via the `SAFE_INSTALL_MIN_AGE`
+environment variable.
+
+**One-shot:**
+
+```bash
+SAFE_INSTALL_MIN_AGE=0 claude
+# urgent install permitted in this session only
+```
+
+**Per-session (active shell):**
+
+```bash
+export SAFE_INSTALL_MIN_AGE=0    # disable hold entirely
+export SAFE_INSTALL_MIN_AGE=7    # stricter — only allow packages 7+ days old
+```
+
+**Permanent (not recommended — you lose the typosquat defense):**
+add the env var to your shell profile, or set it in your Claude Code
+`settings.json` hook block:
+
+```json
+{
+  "hooks": {
+    "PreToolUse": [{
+      "matcher": "Bash",
+      "hooks": [{
+        "type": "command",
+        "command": "~/.claude/hooks/dependency-security-gate.sh",
+        "env": { "SAFE_INSTALL_MIN_AGE": "0" }
+      }]
+    }]
+  }
+}
+```
+
+**Auto-bypass when you're already exposed:** if the *installed* version of a
+package has known CVEs, the freshness hold is automatically skipped for that
+package — so security patches still reach you even with the default 3-day
+hold. You don't need to disable the hold to receive a CVE fix.
+
+The same `SAFE_INSTALL_MIN_AGE` variable is read by `mistral-code-security`,
+so one config value covers both AI-assistant tools.
 
 ## How This Compares
 
