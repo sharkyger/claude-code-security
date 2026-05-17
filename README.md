@@ -36,15 +36,16 @@ Zero dependencies (Python stdlib only).
 
 ## How This Compares
 
-Every other security tool for AI coding assistants scans what is already installed. 
-This one blocks the bad package before it ever reaches your machine.
+Most security tools for AI coding assistants scan what is already installed.
+This one blocks the bad package before it ever reaches your machine — with three free public CVE databases, no API key, and broader ecosystem coverage than the only adjacent OSS tool.
 
 | Tool | What it does | Gap |
 |------|-------------|-----|
-| mcp-scan (Stytch) | Audits installed MCP server configs | Post-install audit only |
+| mcp-scan (Invariant Labs) | Audits installed MCP server configs | Post-install audit only |
 | AgentSeal | Scans MCP configs for prompt injection | Config audit, not install blocking |
 | AgentAuditKit | 77-rule scanner with SARIF output | CI/CD integration, not real-time |
 | Endor Labs | Dependency vetting for AI code | Enterprise SaaS, not open source |
+| [attach-guard](https://github.com/attach-dev/attach-guard) | Pre-install gate for npm/pip/go/cargo via Socket.dev | Requires Socket.dev API key; covers 4 ecosystems (we cover 7); no min-age defense; no bundled hooks for secrets/PII/dangerous bash/git |
 
 **Our approach:** 
 Real-time interception at the moment the AI agent suggests `pip install` / `npm install`. 
