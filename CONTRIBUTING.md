@@ -1,6 +1,6 @@
 # Contributing
 
-Thanks for considering a contribution to claude-code-security. This is a solo-maintained tool, so a few notes up front to set expectations:
+Thanks for considering a contribution to claude-code-cve-gate. This is a solo-maintained tool, so a few notes up front to set expectations:
 
 - I review PRs and issues when I have time, usually within a few days.
 - Small, focused changes get merged faster than sprawling ones.
@@ -14,15 +14,15 @@ Three flavors:
 - **Feature request** — something you'd like the tool to do
 - **Hook blocked something legitimate** — a hook fired on input that shouldn't have been blocked (the most common kind for this tool — pick this if a security gate misfires)
 
-Pick the right template at <https://github.com/sharkyger/claude-code-security/issues/new/choose>.
+Pick the right template at <https://github.com/sharkyger/claude-code-cve-gate/issues/new/choose>.
 
 **Security issues**: do not open a public issue. See [SECURITY.md](SECURITY.md) for the private disclosure flow.
 
 ## Dev setup
 
 ```bash
-git clone https://github.com/sharkyger/claude-code-security.git
-cd claude-code-security
+git clone https://github.com/sharkyger/claude-code-cve-gate.git
+cd claude-code-cve-gate
 ```
 
 The hooks are bash. The vulnerability checker is Python (no requirements file; `certifi` is used when available for SSL on macOS, otherwise the system CA bundle).

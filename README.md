@@ -1,4 +1,6 @@
-# Claude Code Security
+# Claude Code CVE Gate
+
+> Third-party tool. Not affiliated with Anthropic.
 
 Security-first wrapper for the package installs Claude Code runs on your behalf.
 Every `pip install`, `npm install`, and `brew install` your AI coding assistant suggests gets checked against 3 vulnerability databases before it touches your system, so you never blindly pull in a known CVE.
@@ -88,7 +90,7 @@ auto-bypass — set `SAFE_INSTALL_MIN_AGE=0` for that install, then unset.
 *does* skip the freshness hold when the installed version has known CVEs;
 that logic lives in the brew wrapper, not in the scanner the hook calls.)
 
-The same `SAFE_INSTALL_MIN_AGE` variable is read by `mistral-code-security`,
+The same `SAFE_INSTALL_MIN_AGE` variable is read by `mistral-code-cve-gate`,
 so one config value covers both AI-assistant tools.
 
 ## How This Compares
@@ -113,8 +115,8 @@ Three databases checked, decision made, install blocked or allowed — before an
 ### Clone and install
 
 ```bash
-git clone https://github.com/sharkyger/claude-code-security.git
-cd claude-code-security
+git clone https://github.com/sharkyger/claude-code-cve-gate.git
+cd claude-code-cve-gate
 bash install.sh
 ```
 
@@ -221,7 +223,7 @@ Copy them to `.claude/agents/` and invoke via the Agent tool for on-demand secur
 ## Related
 
 - [homebrew-safe-upgrade](https://github.com/sharkyger/homebrew-safe-upgrade) - Same scanner integrated into Homebrew upgrades
-- [mistral-code-security](https://github.com/sharkyger/mistral-code-security) - Same protection for Mistral AI coding tools
+- [mistral-code-cve-gate](https://github.com/sharkyger/mistral-code-cve-gate) - Same protection for Mistral AI coding tools
 
 ## License
 

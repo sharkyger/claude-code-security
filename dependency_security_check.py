@@ -54,7 +54,7 @@ try:
 except ImportError:
     SSL_CONTEXT = ssl.create_default_context()
 
-USER_AGENT = "claude-code-security/1.1"
+USER_AGENT = "claude-code-cve-gate/1.1"
 
 # Maximum NVD fallback calls for transitive deps that OSV reported as clean.
 # Keeps worst-case latency bounded under the rate limit (5 req / 30s anonymous).
@@ -701,7 +701,7 @@ def resolve_composer_deps(package_name, version=None):
     # No `minimum-stability` key — composer's default is "stable", and pinning
     # it here would cause valid pre-release version specs to be rejected.
     manifest = {
-        "name": "claude-code-security/dep-check",
+        "name": "claude-code-cve-gate/dep-check",
         "require": {package_name: constraint},
         "prefer-stable": True,
     }
