@@ -5,3 +5,8 @@ __pycache__/
 venv/
 *.egg-info/
 .DS_Store
+
+# Local code-review artifacts (Mistral Vibe / CodeRabbit / subagent) — never commit
+.codereview/
+# Local-only working notes / security handoffs — never commit
+*.local.md
