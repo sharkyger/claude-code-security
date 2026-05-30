@@ -109,6 +109,9 @@ for PKG in $PACKAGES; do
   if [ "$ECOSYSTEM" = "pip" ]; then
     PKG_WITH_VER=$(echo "$PIP_SEGMENT" | grep -oE "${PKG}[>=<!=]+[0-9][^ ]*" | head -1)
     [ -n "$PKG_WITH_VER" ] && PKG_VERSION=$(echo "$PKG_WITH_VER" | sed -E 's/^[^>=<!=]+[>=<!=]+//')
+    # Range form like `>=3.0,<4.0` leaves a comma in PKG_VERSION → scanner
+    # silently drops the upper bound. Pass no version; scanner resolves latest.
+    case "$PKG_VERSION" in *,*) PKG_VERSION="" ;; esac
   fi
 
   if [ -n "$PKG_VERSION" ]; then

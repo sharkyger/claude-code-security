@@ -24,10 +24,10 @@ When Claude Code tries to install a package, this system:
 
 1. **Intercepts** the install command (pip, npm, composer, cargo, go, gem, brew)
 2. **Resolves the full transitive tree** for pip / npm / composer / gem via the package manager's own dry-run mode — every direct and indirect dependency gets checked, not just the named package. Use `--no-deps` to limit the check to the top-level package
-3. **Queries 3 databases** for known vulnerabilities:
+3. **Queries up to 3 databases** for known vulnerabilities:
    - [NIST NVD](https://nvd.nist.gov/) - US government vulnerability database
-   - [OSV.dev](https://osv.dev/) - Google open source vulnerability database, batch-queried for the resolved tree
-   - [GitHub Advisory Database](https://github.com/advisories) - GitHub security advisories
+   - [OSV.dev](https://osv.dev/) - Google open source vulnerability database, batch-queried for the resolved tree (does not index Homebrew formulae — brew installs are checked against NVD + GHSA only)
+   - [GitHub Advisory Database](https://github.com/advisories) - GitHub security advisories. Transitive deps are queried via OSV-batch + a bounded NVD fallback (3 packages per call) to stay under anonymous rate limits; per-transitive GHSA is intentionally not queried for the same reason.
 4. **Holds fresh versions** (default 3 days) for pip + npm — if a package's latest release is younger than N days, the install is held. Defends against typosquat / zero-hour publish attacks where a malicious version goes live minutes after credential theft, before any CVE database knows. Override via `SAFE_INSTALL_MIN_AGE` env var (see **Bypass / Override** below)
 5. **Fails closed on demand** — set `STRICT_FAIL_CLOSED=1` to turn database errors into hard blocks (default is best-effort allow when at least one DB returns clean)
 6. **Blocks** the install if vulnerabilities are found, **allows** it through if clean
@@ -92,6 +92,22 @@ that logic lives in the brew wrapper, not in the scanner the hook calls.)
 
 The same `SAFE_INSTALL_MIN_AGE` variable is read by `mistral-code-cve-gate`,
 so one config value covers both AI-assistant tools.
+
+## External dependency: PMG for npm gating
+
+The bundled scanner (`dependency_security_check.py`) checks package metadata against 3 CVE databases plus a freshness hold. For `npm install` specifically, that gate runs in parallel with [PMG (Package Manager Guard)](https://github.com/safedep/pmg) — an Apache-2.0 wrapper that adds pre-install **malware** detection and a configurable cooldown on top of CVE matching.
+
+PMG is a **declared external dependency**, not vendored. Install it once globally:
+
+```bash
+npm i -g @safedep/pmg
+```
+
+Then the `npm_pmg_gate.py` helper (`run_npm_via_pmg(["install", "express"])`) routes npm operations through `pmg npm …`. If `pmg` is not on `PATH`, the helper **fails closed** with an install hint — no silent fallback to bare `npm`.
+
+- License: Apache 2.0 (code). Threat feed is cloud-hosted and free, with no API key required; per-verdict audit trail is not exposed by the upstream service.
+- Scope: pre-install CVE + malware + configurable cooldown. Complements (does not replace) `dependency_security_check.py`.
+- Phase 2 (separate PR): a `PreToolUse` Bash hook that auto-routes the Claude Code agent's `npm install` / `npm ci` / `npx` / `pnpm install` commands through this helper. Until that hook lands, the gate only fires when explicitly invoked.
 
 ## How This Compares
 

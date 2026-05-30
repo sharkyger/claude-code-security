@@ -27,8 +27,8 @@ if echo "$COMMAND" | grep -qE '(cat|head|tail|less|more|bat)\s+.*\.env(\s|$)'; t
   exit 2
 fi
 
-# Block printing secret env vars
-if echo "$COMMAND" | grep -qE '(echo|printf|printenv)\s+.*\$(API_KEY|SECRET_KEY|PASSWORD|PRIVATE_KEY|AWS_SECRET|ANTHROPIC_API_KEY|MISTRAL_API_KEY)'; then
+# Block printing secret env vars (matches $VAR and ${VAR} forms)
+if echo "$COMMAND" | grep -qE '(echo|printf|printenv)\s+.*\$\{?(API_KEY|SECRET_KEY|PASSWORD|PRIVATE_KEY|AWS_SECRET|ANTHROPIC_API_KEY|MISTRAL_API_KEY)\}?'; then
   echo "BLOCKED: Cannot print secret environment variables." >&2
   exit 2
 fi
